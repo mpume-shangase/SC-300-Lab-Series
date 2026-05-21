@@ -34,7 +34,7 @@ You've just been hired as the IAM administrator for Expat Teacher's Lounge. Your
 
 **Where:** Entra admin center → Entra ID → Overview → Properties
 
-1. Change the tenant display name to `IAM Lab Corp`
+1. Change the tenant display name to `Expat Teacher's Lounge`
 2. Set the **Technical contact** to your email address
 3. Set the **Notification language** to English
 4. Click **Save**
