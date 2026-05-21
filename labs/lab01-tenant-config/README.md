@@ -6,7 +6,7 @@
 
 ## Scenario
 
-You've just been hired as the IAM administrator for IAM Lab Corp. Your first task is to configure the Microsoft Entra ID tenant from scratch — set up the role structure, organize the directory with administrative units, and establish the foundational settings that everything else will build on.
+You've just been hired as the IAM administrator for Expat Teacher's Lounge. Your first task is to configure the Microsoft Entra ID tenant from scratch — set up the role structure, organize the directory with administrative units, and establish the foundational settings that everything else will build on.
 
 ---
 
