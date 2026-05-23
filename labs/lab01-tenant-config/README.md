@@ -6,7 +6,7 @@
 
 ## Scenario
 
-You've just been hired as the IAM administrator for Expat Teacher's Lounge. Your first task is to configure the Microsoft Entra ID tenant from scratch — set up the role structure, organize the directory with administrative units, and establish the foundational settings that everything else will build on.
+You've just been hired as the IAM administrator for Teach Rich. Your first task is to configure the Microsoft Entra ID tenant from scratch — set up the role structure, organize the directory with administrative units, and establish the foundational settings that everything else will build on.
 
 ---
 
@@ -34,7 +34,7 @@ You've just been hired as the IAM administrator for Expat Teacher's Lounge. Your
 
 **Where:** Entra admin center → Entra ID → Overview → Properties
 
-1. Change the tenant display name to `Expat Teacher's Lounge`
+1. Change the tenant display name to Teach Rich`
 2. Set the **Technical contact** to your email address
 3. Set the **Notification language** to English
 4. Click **Save**
@@ -309,7 +309,7 @@ Write-Host "Role assignments exported to ./reports/role-assignments.csv" -Foregr
 
 Go through this checklist and confirm each item:
 
-- [ ] Tenant name changed to IAM Lab Corp
+- [ ] Tenant name changed to Teach Rich
 - [ ] Technical contact email set
 - [ ] Users can register applications: No
 - [ ] Restrict non-admin users from creating tenants: Yes
