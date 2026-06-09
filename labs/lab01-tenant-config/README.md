@@ -396,7 +396,7 @@ openssl req -x509 \
 ### Part 4 — Export Certificate Files
 
 ```powershell
-# Public certificate (.cer) — safe to upload to Entra ID
+# Public certificate (.cer) — safe to upload to Entra ID - Windows
 Export-Certificate `
     -Cert $cert `
     -FilePath "$HOME/Documents/IAM-Projects/certs/IAM-Lab-GraphApp.cer"
@@ -409,9 +409,11 @@ Export-PfxCertificate `
     -FilePath "$HOME/Documents/IAM-Projects/certs/IAM-Lab-GraphApp.pfx" `
     -Password $pfxPassword
 
+
+# Navigate to the correct directory - Mac
 cd ~/Documents/IAM-Projects/certs
 
-# Public certificate (.cer) — safe to upload to Entra ID
+# Public certificate (.cer) — safe to upload to Entra ID - Mac
 openssl x509 \
   -outform der \
   -in IAM-Lab-GraphApp.pem \
