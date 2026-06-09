@@ -520,19 +520,34 @@ Get-MgRoleManagementDirectoryRoleAssignment -All | ForEach-Object {
 ### Export full audit report to CSV
 
 ```powershell
-Get-MgDirectoryRoleAssignment -All | ForEach-Object {
-    $role = Get-MgDirectoryRoleDefinition -UnifiedRoleDefinitionId $_.RoleDefinitionId
-    $principal = Get-MgDirectoryObject -DirectoryObjectId $_.PrincipalId
+
+#Before running the export code, make sure these modules are loaded
+Import-Module Microsoft.Graph.Identity.Governance
+Import-Module Microsoft.Graph.Identity.DirectoryManagement
+
+# Make sure the reports folder exists
+New-Item -ItemType Directory -Path "./reports" -Force | Out-Null
+
+Get-MgRoleManagementDirectoryRoleAssignment -All | ForEach-Object {
+    $assignment = $_
+
+    $role = Get-MgRoleManagementDirectoryRoleDefinition `
+        -UnifiedRoleDefinitionId $assignment.RoleDefinitionId
+
+    $principal = Get-MgDirectoryObject `
+        -DirectoryObjectId $assignment.PrincipalId
+
     [PSCustomObject]@{
         Role          = $role.DisplayName
         AssignedTo    = $principal.AdditionalProperties.displayName
         PrincipalType = $principal.AdditionalProperties.'@odata.type'
-        Scope         = $_.DirectoryScopeId
+        Scope         = $assignment.DirectoryScopeId
         Timestamp     = Get-Date -Format 'yyyy-MM-dd HH:mm:ss'
     }
 } | Export-Csv -Path "./reports/role-assignments.csv" -NoTypeInformation
 
 Write-Host "Report saved to ./reports/role-assignments.csv" -ForegroundColor Green
+
 ```
 
 **Additional fields explained:**
