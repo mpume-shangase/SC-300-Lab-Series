@@ -408,6 +408,20 @@ Export-PfxCertificate `
     -Cert $cert `
     -FilePath "$HOME/Documents/IAM-Projects/certs/IAM-Lab-GraphApp.pfx" `
     -Password $pfxPassword
+
+cd ~/Documents/IAM-Projects/certs
+
+# Public certificate (.cer) — safe to upload to Entra ID
+openssl x509 \
+  -outform der \
+  -in IAM-Lab-GraphApp.pem \
+  -out IAM-Lab-GraphApp.cer
+
+  # PFX with private key — stays on your machine only
+openssl pkcs12 -export \
+  -out IAM-Lab-GraphApp.pfx \
+  -inkey IAM-Lab-GraphApp.key \
+  -in IAM-Lab-GraphApp.pem
 ```
 
 > ⚠️ The `.pfx` file contains your private key. Treat it like a password — never share it, never commit it to a repository.
