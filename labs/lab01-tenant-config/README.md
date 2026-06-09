@@ -360,7 +360,7 @@ Add these permissions:
 New-Item -ItemType Directory -Force -Path "$HOME/Documents/IAM-Projects/certs"
 New-Item -ItemType Directory -Force -Path "$HOME/Documents/IAM-Projects/reports"
 
-# Generate self-signed certificate
+# Generate self-signed certificate - Windows
 $cert = New-SelfSignedCertificate `
     -Subject "CN=IAM-Lab-GraphApp" `
     -CertStoreLocation "Cert:\CurrentUser\My" `
@@ -369,6 +369,20 @@ $cert = New-SelfSignedCertificate `
     -KeyLength 2048 `
     -HashAlgorithm SHA256 `
     -NotAfter (Get-Date).AddYears(2)
+
+
+# Generate self-signed certificate - Mac
+mkdir -p ~/Documents/IAM-Projects/certs
+cd ~/Documents/IAM-Projects/certs
+
+openssl req -x509 \
+  -newkey rsa:2048 \
+  -sha256 \
+  -days 730 \
+  -nodes \
+  -keyout IAM-Lab-GraphApp.key \
+  -out IAM-Lab-GraphApp.pem \
+  -subj "/CN=IAM-Lab-GraphApp"
 ```
 
 | Parameter | Purpose |
