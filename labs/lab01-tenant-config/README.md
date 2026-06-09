@@ -439,10 +439,11 @@ Browse to `IAM-Lab-GraphApp.cer` and upload. Verify the thumbprint appears and t
 ```powershell
 # Load values from environment or paste your own for local testing only
 # Never hardcode Tenant ID or Client ID in files committed to a repository
-$TenantId = $env:GRAPH_TENANT_ID      # or paste your tenant ID here for local testing
-$ClientId = $env:GRAPH_CLIENT_ID      # or paste your client ID here for local testing
 
-$pfxPassword = ConvertTo-SecureString -String "ReplaceWithStrongPassword!" -Force -AsPlainText
+$TenantId = $env:GRAPH_TENANT_ID      # or "paste your tenant ID here" for local testing
+$ClientId = $env:GRAPH_CLIENT_ID      # or "paste your client ID here" for local testing
+
+$pfxPassword = Read-Host "Enter your PFX password" -AsSecureString
 
 $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
     "$HOME/Documents/IAM-Projects/certs/IAM-Lab-GraphApp.pfx",
