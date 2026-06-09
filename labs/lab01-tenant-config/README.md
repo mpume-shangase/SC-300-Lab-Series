@@ -563,28 +563,43 @@ Write-Host "Report saved to ./reports/role-assignments.csv" -ForegroundColor Gre
 ```powershell
 # Verify custom role assignments
 Write-Host "`n=== Custom Role Assignments ===" -ForegroundColor Cyan
-Get-MgDirectoryRoleAssignment -All | ForEach-Object {
-    $role = Get-MgDirectoryRoleDefinition -UnifiedRoleDefinitionId $_.RoleDefinitionId
-    $principal = Get-MgDirectoryObject -DirectoryObjectId $_.PrincipalId
+
+Get-MgRoleManagementDirectoryRoleAssignment -All | ForEach-Object {
+    $assignment = $_
+
+    $role = Get-MgRoleManagementDirectoryRoleDefinition `
+        -UnifiedRoleDefinitionId $assignment.RoleDefinitionId
+
+    $principal = Get-MgDirectoryObject `
+        -DirectoryObjectId $assignment.PrincipalId
+
     if ($role.DisplayName -eq "IAM Operator") {
         [PSCustomObject]@{
             Role       = $role.DisplayName
             AssignedTo = $principal.AdditionalProperties.displayName
-            Scope      = $_.DirectoryScopeId
+            Scope      = $assignment.DirectoryScopeId
         }
     }
 } | Format-Table -AutoSize
 
+
 # Verify AU-scoped assignments
 Write-Host "`n=== AU-Scoped Role Assignments ===" -ForegroundColor Cyan
-Get-MgDirectoryRoleAssignment -All | ForEach-Object {
-    $role = Get-MgDirectoryRoleDefinition -UnifiedRoleDefinitionId $_.RoleDefinitionId
-    $principal = Get-MgDirectoryObject -DirectoryObjectId $_.PrincipalId
-    if ($_.DirectoryScopeId -ne "/") {
+
+Get-MgRoleManagementDirectoryRoleAssignment -All | ForEach-Object {
+    $assignment = $_
+
+    $role = Get-MgRoleManagementDirectoryRoleDefinition `
+        -UnifiedRoleDefinitionId $assignment.RoleDefinitionId
+
+    $principal = Get-MgDirectoryObject `
+        -DirectoryObjectId $assignment.PrincipalId
+
+    if ($assignment.DirectoryScopeId -ne "/") {
         [PSCustomObject]@{
             Role       = $role.DisplayName
             AssignedTo = $principal.AdditionalProperties.displayName
-            Scope      = $_.DirectoryScopeId
+            Scope      = $assignment.DirectoryScopeId
         }
     }
 } | Format-Table -AutoSize
