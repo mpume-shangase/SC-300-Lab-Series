@@ -489,13 +489,19 @@ New-Item -ItemType Directory -Force -Path "./reports"
 ### Pull and display all active role assignments
 
 ```powershell
-Get-MgDirectoryRoleAssignment -All | ForEach-Object {
-    $role = Get-MgDirectoryRoleDefinition -UnifiedRoleDefinitionId $_.RoleDefinitionId
-    $principal = Get-MgDirectoryObject -DirectoryObjectId $_.PrincipalId
+Get-MgRoleManagementDirectoryRoleAssignment -All | ForEach-Object {
+    $assignment = $_
+
+    $role = Get-MgRoleManagementDirectoryRoleDefinition `
+        -UnifiedRoleDefinitionId $assignment.RoleDefinitionId
+
+    $principal = Get-MgDirectoryObject `
+        -DirectoryObjectId $assignment.PrincipalId
+
     [PSCustomObject]@{
         Role       = $role.DisplayName
         AssignedTo = $principal.AdditionalProperties.displayName
-        Scope      = $_.DirectoryScopeId
+        Scope      = $assignment.DirectoryScopeId
     }
 } | Format-Table -AutoSize
 ```
