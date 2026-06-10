@@ -337,18 +337,19 @@ Get-MgSubscribedSku | Select-Object SkuPartNumber, ConsumedUnits,
 ```powershell
 # ================================
 # Assign SPE_E3 License to Unlicensed Users
+# Handles UsageLocation delay
 # ================================
 
 Import-Module Microsoft.Graph.Users
 Import-Module Microsoft.Graph.Identity.DirectoryManagement
 
-# Use the SKU that exists in your tenant
 $skuPartNumber = "SPE_E3"
+$usageLocation = "US"
 
 $sku = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq $skuPartNumber }
 
 if (-not $sku) {
-    Write-Host "License SKU '$skuPartNumber' was not found in this tenant." -ForegroundColor Red
+    Write-Host "License SKU '$skuPartNumber' was not found." -ForegroundColor Red
     Get-MgSubscribedSku |
         Select-Object SkuPartNumber, SkuId, ConsumedUnits, @{Name="Enabled";Expression={$_.PrepaidUnits.Enabled}} |
         Format-Table -AutoSize
@@ -358,7 +359,6 @@ if (-not $sku) {
 Write-Host "Using license: $($sku.SkuPartNumber)" -ForegroundColor Green
 Write-Host "Available licenses: $($sku.PrepaidUnits.Enabled - $sku.ConsumedUnits)" -ForegroundColor Cyan
 
-# Get unlicensed internal users
 $unlicensedUsers = Get-MgUser `
     -All `
     -Property "Id,DisplayName,UserPrincipalName,AssignedLicenses,UsageLocation" |
@@ -372,14 +372,28 @@ Write-Host "Unlicensed users found: $($unlicensedUsers.Count)" -ForegroundColor 
 foreach ($user in $unlicensedUsers) {
 
     try {
-        # A usage location is required before assigning Microsoft 365 licenses
-        if ([string]::IsNullOrWhiteSpace($user.UsageLocation)) {
+        # Make sure UsageLocation is set
+        if ([string]::IsNullOrWhiteSpace($user.UsageLocation) -or $user.UsageLocation -ne $usageLocation) {
+
             Update-MgUser `
                 -UserId $user.Id `
-                -UsageLocation "US" `
+                -UsageLocation $usageLocation `
                 -ErrorAction Stop
 
             Write-Host "[UPDATED USAGE LOCATION] $($user.DisplayName)" -ForegroundColor Cyan
+
+            # Wait for Graph/Entra to register the change
+            Start-Sleep -Seconds 8
+
+            # Re-read the user after updating UsageLocation
+            $user = Get-MgUser `
+                -UserId $user.Id `
+                -Property "Id,DisplayName,UserPrincipalName,AssignedLicenses,UsageLocation"
+        }
+
+        if ($user.UsageLocation -ne $usageLocation) {
+            Write-Host "[SKIPPED] $($user.DisplayName) - UsageLocation is still not valid: $($user.UsageLocation)" -ForegroundColor Yellow
+            continue
         }
 
         $addLicenses = @(
@@ -403,26 +417,6 @@ foreach ($user in $unlicensedUsers) {
 }
 
 Write-Host "`nLicense assignment process completed." -ForegroundColor Green
-```
-
-### 6c: Generate a License Report
-
-```powershell
-Get-MgUser -All -Property DisplayName,Department,AssignedLicenses,UserPrincipalName | 
-    Where-Object { $_.UserPrincipalName -notlike "*#EXT#*" } |
-    Select-Object DisplayName, Department, 
-        @{N='Licensed';E={if($_.AssignedLicenses.Count -gt 0){"Yes"}else{"No"}}},
-        @{N='LicenseCount';E={$_.AssignedLicenses.Count}} |
-    Sort-Object Licensed, Department | Format-Table
-
-# Export to CSV
-Get-MgUser -All -Property DisplayName,Department,AssignedLicenses,UserPrincipalName |
-    Where-Object { $_.UserPrincipalName -notlike "*#EXT#*" } |
-    Select-Object DisplayName, Department,
-        @{N='Licensed';E={if($_.AssignedLicenses.Count -gt 0){"Yes"}else{"No"}}} |
-    Export-Csv -Path "./reports/license-report.csv" -NoTypeInformation
-
-Write-Host "License report exported" -ForegroundColor Green
 ```
 
 **SC-300 exam tip:** Know how to assign licenses via the portal (Users → Licenses) and via PowerShell. Know that Usage Location must be set before assigning licenses. Know how group-based licensing works (assign licenses to a group instead of individual users).
