@@ -128,36 +128,71 @@ Lucas,Garcia,Sales,Enterprise Account Executive,Employee
 Write the provisioning script:
 
 ```powershell
-$Domain = "yourdomain.onmicrosoft.com"
-$users = Import-Csv ./data/BulkUsers.csv
+# ================================
+# Bulk Create Users from CSV
+# Domain: "Your domain"
+# ================================
+
+Import-Module Microsoft.Graph.Users
+
+$Domain = "your domain"
+$csvPath = "./data/BulkUsers.csv"
+
+# Check if CSV file exists
+if (-not (Test-Path $csvPath)) {
+    Write-Host "CSV file not found at $csvPath" -ForegroundColor Red
+    return
+}
+
+$users = Import-Csv $csvPath
 
 foreach ($user in $users) {
-    $upn = "$($user.FirstName.ToLower()).$($user.LastName.ToLower())@$Domain"
-    $existing = Get-MgUser -Filter "userPrincipalName eq '$upn'" -ErrorAction SilentlyContinue
 
-    if (-not $existing) {
-        $params = @{
-            AccountEnabled    = $true
-            DisplayName       = "$($user.FirstName) $($user.LastName)"
-            GivenName         = $user.FirstName
-            Surname           = $user.LastName
-            UserPrincipalName = $upn
-            MailNickname      = "$($user.FirstName.ToLower()).$($user.LastName.ToLower())"
-            Department        = $user.Department
-            JobTitle          = $user.JobTitle
-            EmployeeType      = $user.EmployeeType
-            UsageLocation     = "US"
-            PasswordProfile   = @{
-                Password = "Welcome_$(Get-Random -Maximum 9999)!"
-                ForceChangePasswordNextSignIn = $true
+    $firstName = $user.FirstName.Trim()
+    $lastName  = $user.LastName.Trim()
+
+    $upn = "$($firstName.ToLower()).$($lastName.ToLower())@$Domain"
+    $mailNickname = "$($firstName.ToLower()).$($lastName.ToLower())"
+
+    Write-Host "`nChecking user: $upn" -ForegroundColor Cyan
+
+    try {
+        $existing = Get-MgUser -Filter "userPrincipalName eq '$upn'" -ErrorAction SilentlyContinue
+
+        if (-not $existing) {
+
+            $params = @{
+                AccountEnabled    = $true
+                DisplayName       = "$firstName $lastName"
+                GivenName         = $firstName
+                Surname           = $lastName
+                UserPrincipalName = $upn
+                MailNickname      = $mailNickname
+                Department        = $user.Department
+                JobTitle          = $user.JobTitle
+                EmployeeType      = $user.EmployeeType
+                UsageLocation     = "US"
+                PasswordProfile   = @{
+                    Password = "Welcome$((Get-Random -Minimum 10000 -Maximum 99999))!"
+                    ForceChangePasswordNextSignIn = $true
+                }
             }
+
+            New-MgUser -BodyParameter $params -ErrorAction Stop | Out-Null
+
+            Write-Host "[CREATED] $upn - $($user.Department)" -ForegroundColor Green
         }
-        New-MgUser -BodyParameter $params | Out-Null
-        Write-Host "[CREATED] $upn - $($user.Department)" -ForegroundColor Green
-    } else {
-        Write-Host "[EXISTS]  $upn" -ForegroundColor Yellow
+        else {
+            Write-Host "[EXISTS]  $upn" -ForegroundColor Yellow
+        }
+    }
+    catch {
+        Write-Host "[FAILED]  $upn" -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
     }
 }
+
+Write-Host "`nBulk user creation process completed." -ForegroundColor Green
 ```
 
 Verify the users:
