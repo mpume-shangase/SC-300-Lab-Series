@@ -348,6 +348,8 @@ Add these permissions:
 |------------|---------|
 | `RoleManagement.Read.Directory` | Read role assignments |
 | `Directory.Read.All` | Read users, groups, and directory objects |
+| `Directory.ReadWrite.All` | Read and write directory data|
+| `User.ReadWrite.All` | Read and write all user's full profiles |
 
 **Critical:** Click **Grant admin consent for [tenant name]** and confirm. Verify green checkmarks appear next to both permissions. Without this step, every Graph call returns 403 Forbidden.
 
