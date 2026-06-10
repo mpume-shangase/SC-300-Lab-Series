@@ -335,20 +335,74 @@ Get-MgSubscribedSku | Select-Object SkuPartNumber, ConsumedUnits,
 ### 6b: Assign Licenses to Users
 
 ```powershell
-$sku = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq "SPE_E5" }
+# ================================
+# Assign SPE_E3 License to Unlicensed Users
+# ================================
 
-# Assign E5 license to all users without a license
-$unlicensedUsers = Get-MgUser -All -Property Id,DisplayName,AssignedLicenses | 
-    Where-Object { $_.AssignedLicenses.Count -eq 0 -and $_.UserPrincipalName -notlike "*#EXT#*" }
+Import-Module Microsoft.Graph.Users
+Import-Module Microsoft.Graph.Identity.DirectoryManagement
+
+# Use the SKU that exists in your tenant
+$skuPartNumber = "SPE_E3"
+
+$sku = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq $skuPartNumber }
+
+if (-not $sku) {
+    Write-Host "License SKU '$skuPartNumber' was not found in this tenant." -ForegroundColor Red
+    Get-MgSubscribedSku |
+        Select-Object SkuPartNumber, SkuId, ConsumedUnits, @{Name="Enabled";Expression={$_.PrepaidUnits.Enabled}} |
+        Format-Table -AutoSize
+    return
+}
+
+Write-Host "Using license: $($sku.SkuPartNumber)" -ForegroundColor Green
+Write-Host "Available licenses: $($sku.PrepaidUnits.Enabled - $sku.ConsumedUnits)" -ForegroundColor Cyan
+
+# Get unlicensed internal users
+$unlicensedUsers = Get-MgUser `
+    -All `
+    -Property "Id,DisplayName,UserPrincipalName,AssignedLicenses,UsageLocation" |
+Where-Object {
+    $_.AssignedLicenses.Count -eq 0 -and
+    $_.UserPrincipalName -notlike "*#EXT#*"
+}
+
+Write-Host "Unlicensed users found: $($unlicensedUsers.Count)" -ForegroundColor Cyan
 
 foreach ($user in $unlicensedUsers) {
+
     try {
-        Set-MgUserLicense -UserId $user.Id -AddLicenses @(@{SkuId = $sku.SkuId}) -RemoveLicenses @()
-        Write-Host "[LICENSED] $($user.DisplayName)" -ForegroundColor Green
-    } catch {
-        Write-Host "[FAILED]  $($user.DisplayName): $($_.Exception.Message)" -ForegroundColor Red
+        # A usage location is required before assigning Microsoft 365 licenses
+        if ([string]::IsNullOrWhiteSpace($user.UsageLocation)) {
+            Update-MgUser `
+                -UserId $user.Id `
+                -UsageLocation "US" `
+                -ErrorAction Stop
+
+            Write-Host "[UPDATED USAGE LOCATION] $($user.DisplayName)" -ForegroundColor Cyan
+        }
+
+        $addLicenses = @(
+            @{
+                SkuId = $sku.SkuId
+            }
+        )
+
+        Set-MgUserLicense `
+            -UserId $user.Id `
+            -AddLicenses $addLicenses `
+            -RemoveLicenses @() `
+            -ErrorAction Stop | Out-Null
+
+        Write-Host "[LICENSED] $($user.DisplayName) <$($user.UserPrincipalName)>" -ForegroundColor Green
+    }
+    catch {
+        Write-Host "[FAILED] $($user.DisplayName) <$($user.UserPrincipalName)>" -ForegroundColor Red
+        Write-Host $_.Exception.Message -ForegroundColor Yellow
     }
 }
+
+Write-Host "`nLicense assignment process completed." -ForegroundColor Green
 ```
 
 ### 6c: Generate a License Report
