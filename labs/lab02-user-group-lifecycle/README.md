@@ -107,6 +107,9 @@ Connect-MgGraph -ClientId $ClientId -TenantId $TenantId -Certificate $cert
 Create a CSV file with 10 more users:
 
 ```powershell
+#Create the ./data folder
+New-Item -ItemType Directory -Path ./data -Force | Out-Null
+
 @"
 FirstName,LastName,Department,JobTitle,EmployeeType
 Liam,Cooper,Engineering,Backend Developer,Employee
