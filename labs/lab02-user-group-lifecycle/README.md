@@ -304,6 +304,11 @@ Click into `IAMAttributes` → **+ Add attribute**
 4. Repeat for several users with different values
 
 ### 5d: Query Users by Attribute with PowerShell
+Before we can query users by attribute with PowerShell, we need to give Ms Graph permissions for custom attributes. 
+
+1. Go to **API permissions** → select → **Add permissions**
+2. Add the following permissions **+ CustomSecAttributeAssignment.Read.All
+CustomSecAttributeAssignment.ReadWrite.All**
 
 ```powershell
 # Find all users with Confidential clearance
