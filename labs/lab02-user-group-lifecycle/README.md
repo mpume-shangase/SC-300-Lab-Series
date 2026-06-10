@@ -91,9 +91,16 @@ Open PowerShell and connect to Graph:
 ```powershell
 pwsh
 
-$TenantId = "your-tenant-id"
-$ClientId = "your-client-id"
-$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2("$HOME/Documents/IAM-Projects/certs/IAM-Lifecycle-Cert.pfx")
+$TenantId = "your-tenant ID"
+$ClientId = "your-client ID"
+
+$pfxPassword = Read-Host "Enter your PFX password" -AsSecureString
+
+$cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+    "$HOME/Documents/IAM-Projects/certs/IAM-Lab-GraphApp.pfx",
+    $pfxPassword
+)
+
 Connect-MgGraph -ClientId $ClientId -TenantId $TenantId -Certificate $cert
 ```
 
