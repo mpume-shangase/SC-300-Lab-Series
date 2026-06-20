@@ -6,9 +6,14 @@
 
 ## Scenario
 
-IAM Lab Corp has been running on-premises Active Directory for 15 years. The CTO has decided to move to a hybrid identity model — keeping on-prem AD for legacy applications while extending identities to the cloud for Microsoft 365 and SaaS applications. You need to build the on-prem AD environment, synchronize identities to Entra ID, configure the right authentication method, and ensure the sync is healthy and monitored.
+TeachRich has been running on-premises Active Directory for 15 years. The CTO has decided to move to a hybrid identity model — keeping on-prem AD for legacy applications while extending identities to the cloud for Microsoft 365 and SaaS applications. You need to build the on-prem AD environment, synchronize identities to Entra ID, configure the right authentication method, and ensure the sync is healthy and monitored.
 
 This is the most hands-on lab in Domain 1 and one of the most commonly tested topics on SC-300.
+
+> **Naming model used in this lab (read this first — it's exam-relevant):**
+> - **On-premises AD domain:** `teachrich.local` — internal-only, non-routable. `.local` deliberately *cannot* be used in the cloud, which is the whole reason Step 5 exists.
+> - **Cloud (Entra ID) tenant:** **TeachRich**, with the verified custom domain `teachrich.com`.
+> - **Identity matching** works by making the on-prem UPN suffix match the **verified cloud domain** (`teachrich.com`), not the `.local` domain and not the `.onmicrosoft.com` initial domain.
 
 ---
 
@@ -28,6 +33,7 @@ This is the most hands-on lab in Domain 1 and one of the most commonly tested to
 
 - Completed Labs 1-3
 - Microsoft 365 E5 subscription
+- The custom domain `teachrich.com` added and **verified** in your Entra ID tenant (Entra admin center → Identity → Settings → Domain names)
 - A computer capable of running a virtual machine (8GB RAM minimum, 16GB recommended)
 - VirtualBox (free) or Hyper-V (Windows Pro/Enterprise) installed
 - Windows Server 2022 ISO (evaluation from Microsoft Evaluation Center — free for 180 days)
@@ -47,7 +53,7 @@ This is the most hands-on lab in Domain 1 and one of the most commonly tested to
 **Using VirtualBox (Mac or Windows):**
 
 1. Open VirtualBox → click **New**
-2. **Name:** `DC01-IAMLabCorp`
+2. **Name:** `DC01-TeachRich`
 3. **Type:** Microsoft Windows
 4. **Version:** Windows 2022 (64-bit)
 5. **Memory:** 4096 MB (4 GB)
@@ -69,7 +75,7 @@ Before starting the VM:
 4. Accept license terms
 5. Choose **Custom: Install Windows only**
 6. Select the drive → **Next** → wait for installation
-7. Set an Administrator password (e.g., `IAMLabAdmin2026!`) — write this down
+7. Set an Administrator password (e.g., `TeachRichAdmin2026!`) — write this down
 8. Log in to the server
 
 ### 1d: Configure Basic Networking
@@ -85,11 +91,28 @@ Set-DnsClientServerAddress -InterfaceAlias "Ethernet" -ServerAddresses 10.0.2.10
 Rename-Computer -NewName "DC01" -Restart
 ```
 
+> #### 📘 Script explained
+>
+> **What it does:** Gives the server a permanent network address and names it `DC01`.
+>
+> **Why it matters:** A domain controller *must* have a static IP — if its address ever changed, every device that relies on it for logins and DNS would lose contact. Domain controllers also act as DNS servers, which is why the server is told to use *itself* as its primary DNS.
+>
+> **Line by line:**
+> - `New-NetIPAddress` — assigns the fixed IP. `-PrefixLength 24` is shorthand for the subnet mask `255.255.255.0` (it defines which addresses count as "local"). `-DefaultGateway` is the router used to reach the internet.
+> - `Set-DnsClientServerAddress` — sets where the server looks up names. It points to **itself first** (`10.0.2.10`) so it can resolve its own domain, then to `8.8.8.8` (Google's public DNS) as a fallback for internet names.
+> - `Rename-Computer ... -Restart` — renames the machine and reboots, because a name change only takes effect after a restart.
+>
+> **Watch out for:** The IP must sit inside your VirtualBox NAT range or the VM loses internet. Always do this **before** installing AD DS — renaming a domain controller *after* promotion is painful.
+
 After restart, verify internet connectivity:
 
 ```powershell
 Test-Connection google.com
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Sends a few test packets to google.com — PowerShell's version of `ping`. If replies come back, the server has working internet and DNS.
 
 **Why this matters:** In most enterprises, you'll be connecting to an existing on-prem AD environment. Building one from scratch teaches you the fundamentals and makes you appreciate what Entra Connect is actually synchronizing.
 
@@ -105,8 +128,8 @@ Install-WindowsFeature AD-Domain-Services -IncludeManagementTools
 
 # Promote to domain controller
 Install-ADDSForest `
-    -DomainName "iamlabcorp.local" `
-    -DomainNetBIOSName "IAMLABCORP" `
+    -DomainName "teachrich.local" `
+    -DomainNetBIOSName "TEACHRICH" `
     -ForestMode "WinThreshold" `
     -DomainMode "WinThreshold" `
     -InstallDNS:$true `
@@ -114,7 +137,25 @@ Install-ADDSForest `
     -Force:$true
 ```
 
-The server will restart. After restart, log in as `IAMLABCORP\Administrator`.
+> #### 📘 Script explained
+>
+> **What it does:** Turns a plain Windows Server into a **domain controller** and creates a brand-new Active Directory domain called `teachrich.local`.
+>
+> **Why it matters:** This is the on-prem identity foundation — the thing Entra Connect later synchronizes *from*. Understanding it is understanding what "hybrid" actually bridges.
+>
+> **Line by line:**
+> - `Install-WindowsFeature AD-Domain-Services` — installs the AD software. `-IncludeManagementTools` adds the admin consoles and PowerShell commands you'll use later.
+> - `Install-ADDSForest` — creates a new **forest** (the top-level container that holds everything in AD).
+>   - `-DomainName "teachrich.local"` — the internal domain name. `.local` is intentional for an on-prem-only environment, and is exactly why Step 5 exists (`.local` can't be used in the cloud).
+>   - `-DomainNetBIOSName "TEACHRICH"` — the short legacy name used in `TEACHRICH\username` logins.
+>   - `-ForestMode` / `-DomainMode "WinThreshold"` — sets the functional level (WinThreshold = the Windows Server 2016 feature set). Higher levels unlock more features but require all DCs to support them.
+>   - `-InstallDNS:$true` — installs DNS on this server, because AD depends on DNS to locate domain resources.
+>   - `-SafeModeAdministratorPassword` — the **DSRM** (Directory Services Restore Mode) recovery password, used to boot AD into repair mode if it ever breaks. `ConvertTo-SecureString` is required because PowerShell won't accept a plain-text string for a security-sensitive field.
+>   - `-Force:$true` — suppresses the confirmation prompts so the command runs unattended.
+>
+> **Watch out for:** That DSRM password is a real break-glass credential. **In production it would be stored in a secrets vault, never hard-coded** like this — it's only inline here for lab reproducibility.
+
+The server will restart. After restart, log in as `TEACHRICH\Administrator`.
 
 Verify AD is running:
 
@@ -122,6 +163,10 @@ Verify AD is running:
 Get-ADDomain
 Get-ADForest
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Prints the configuration of your new domain and forest. If these return details (domain name, functional levels, DC list) instead of an error, AD installed correctly.
 
 **SC-300 exam tip:** You don't need to know how to install AD DS for the exam, but understanding the on-prem AD structure (domains, forests, OUs, GPOs) helps you understand what Entra Connect synchronizes.
 
@@ -135,13 +180,27 @@ Create OUs and populate with users:
 # Create OUs
 $departments = @("Engineering", "Sales", "Human Resources", "Finance", "Marketing", "IT")
 foreach ($dept in $departments) {
-    New-ADOrganizationalUnit -Name $dept -Path "DC=iamlabcorp,DC=local"
+    New-ADOrganizationalUnit -Name $dept -Path "DC=teachrich,DC=local"
     Write-Host "[CREATED] OU: $dept" -ForegroundColor Green
 }
 
 # Create a Disabled Users OU
-New-ADOrganizationalUnit -Name "Disabled Users" -Path "DC=iamlabcorp,DC=local"
+New-ADOrganizationalUnit -Name "Disabled Users" -Path "DC=teachrich,DC=local"
+```
 
+> #### 📘 Script explained
+>
+> **What it does:** Creates one **Organizational Unit (OU)** per department, plus a "Disabled Users" OU.
+>
+> **Why it matters:** OUs are the folders of Active Directory — they organize users for management, group policy, and (crucially for this lab) **sync filtering**. In Step 6 you choose *which OUs* to synchronize to the cloud, so a clean OU structure here pays off later.
+>
+> **Line by line:**
+> - `$departments = @(...)` — defines a list (array) of department names.
+> - `foreach ($dept in $departments)` — repeats the block once per department.
+> - `New-ADOrganizationalUnit -Path "DC=teachrich,DC=local"` — creates the OU at the root of the domain. The `DC=teachrich,DC=local` part is the domain written in **Distinguished Name** format (how AD addresses every object).
+> - `Write-Host ... -ForegroundColor Green` — prints a green confirmation line so you can see progress as it runs.
+
+```powershell
 # Create users in each department
 $password = ConvertTo-SecureString "UserPass2026!" -AsPlainText -Force
 
@@ -164,7 +223,7 @@ $onPremUsers = @(
 )
 
 foreach ($u in $onPremUsers) {
-    $upn = "$($u.First.ToLower()).$($u.Last.ToLower())@iamlabcorp.local"
+    $upn = "$($u.First.ToLower()).$($u.Last.ToLower())@teachrich.local"
     $sam = "$($u.First.ToLower()).$($u.Last.ToLower())"
     if ($sam.Length -gt 20) { $sam = $sam.Substring(0,20) }
     
@@ -177,7 +236,7 @@ foreach ($u in $onPremUsers) {
         -UserPrincipalName $upn `
         -Department $u.Dept `
         -Title $u.Title `
-        -Path "OU=$($u.OU),DC=iamlabcorp,DC=local" `
+        -Path "OU=$($u.OU),DC=teachrich,DC=local" `
         -AccountPassword $password `
         -Enabled $true `
         -ChangePasswordAtLogon $true
@@ -188,6 +247,23 @@ foreach ($u in $onPremUsers) {
 Write-Host "`nTotal users created: $($onPremUsers.Count)" -ForegroundColor Cyan
 ```
 
+> #### 📘 Script explained
+>
+> **What it does:** Loops through a list of 15 people and creates a real AD account for each, placed in the correct department's OU.
+>
+> **Why it matters:** This is the *engineer's* answer to "create 15 users." Clicking them one at a time in a GUI is what a help-desk tech does; scripting it from a data list is what an IAM engineer does — repeatable, auditable, and fast.
+>
+> **Line by line:**
+> - `$password = ConvertTo-SecureString ...` — defines one starting password as a secure (encrypted-in-memory) string, since `New-ADUser` won't take plain text.
+> - `$onPremUsers = @( @{...}, @{...} )` — a list of **hashtables**, each one a mini record describing a person (first name, last name, department, title, target OU).
+> - `foreach ($u in $onPremUsers)` — repeats the creation block once per person.
+> - `$upn = "...@teachrich.local"` — builds the username automatically as `first.last@teachrich.local`, forced to lowercase for consistency. (Step 5 later switches this suffix to the cloud-routable `teachrich.com`.)
+> - `if ($sam.Length -gt 20) { ... Substring(0,20) }` — the `SamAccountName` (the old-style login name) has a hard **20-character limit** in AD, so this trims anything longer. Handling that limit shows you know AD's real constraints.
+> - `New-ADUser ... -Path "OU=$($u.OU),..."` — creates the account directly in that person's department OU.
+> - `-ChangePasswordAtLogon $true` — forces a password change at first sign-in, so you (the admin) never know anyone's permanent password. That's a least-privilege habit worth pointing out.
+>
+> **Watch out for:** Re-running this script fails on users who already exist. A production-grade version would wrap creation in a check (`if (-not (Get-ADUser -Filter "SamAccountName -eq '$sam'")) { ... }`) so the script is **idempotent** — safe to run more than once.
+
 Verify:
 
 ```powershell
@@ -195,6 +271,15 @@ Get-ADUser -Filter * -Properties Department,Title |
     Select-Object Name, Department, Title, UserPrincipalName | 
     Sort-Object Department | Format-Table
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Lists every user with their department, title, and UPN, sorted by department, in a clean table.
+>
+> **Line by line:**
+> - `Get-ADUser -Filter *` — fetches all users. `-Properties Department,Title` is required because AD only returns a few default fields unless you explicitly ask for more.
+> - `| Select-Object ...` — keeps just the columns you care about.
+> - `| Sort-Object Department | Format-Table` — orders by department and prints it as a readable grid. The `|` (pipe) passes the output of each command into the next.
 
 ---
 
@@ -222,20 +307,35 @@ Before connecting to Entra ID, scan your directory for issues that would cause s
 
 ## Step 5: Add a UPN Suffix for Cloud Matching
 
-On-prem UPNs end in `.local` but cloud UPNs use your `.onmicrosoft.com` domain. You need to add a routable UPN suffix:
+On-prem UPNs end in `.local`, but cloud accounts must use a verified, routable domain — your custom domain `teachrich.com`. You need to add a matching UPN suffix on-prem:
 
 ```powershell
-# Add the cloud domain as a UPN suffix
-Set-ADForest -Identity "iamlabcorp.local" `
-    -UPNSuffixes @{Add="thecyberkhroniclesgmail.onmicrosoft.com"}
+# Add the verified cloud domain as a UPN suffix in the on-prem forest
+Set-ADForest -Identity "teachrich.local" `
+    -UPNSuffixes @{Add="teachrich.com"}
 
-# Update all users to use the new UPN suffix
-Get-ADUser -Filter * -SearchBase "DC=iamlabcorp,DC=local" | ForEach-Object {
-    $newUPN = $_.SamAccountName + "@thecyberkhroniclesgmail.onmicrosoft.com"
+# Update all users to use the new routable UPN suffix
+Get-ADUser -Filter * -SearchBase "DC=teachrich,DC=local" | ForEach-Object {
+    $newUPN = $_.SamAccountName + "@teachrich.com"
     Set-ADUser $_ -UserPrincipalName $newUPN
     Write-Host "[UPDATED] $($_.Name) → $newUPN" -ForegroundColor Green
 }
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Teaches the on-prem forest about the `teachrich.com` domain, then rewrites every user's UPN from `…@teachrich.local` to `…@teachrich.com`.
+>
+> **Why it matters:** This is the linchpin of identity matching. Entra Connect matches an on-prem account to a cloud account by **UPN**, and the cloud only accepts UPNs whose suffix is a **verified domain** in your tenant. The `.local` suffix can never sync, so every user must be switched to `teachrich.com` first. Get this wrong and users sync into the cloud with broken or mismatched identities.
+>
+> **Line by line:**
+> - `Set-ADForest -UPNSuffixes @{Add="teachrich.com"}` — registers `teachrich.com` as a selectable UPN suffix in the forest. `@{Add=...}` is a hashtable telling the command to *add* (not replace) a suffix.
+> - `Get-ADUser -Filter * -SearchBase "DC=teachrich,DC=local"` — gets every user under the domain root.
+> - `| ForEach-Object { ... }` — runs the block once per user. Inside, `$_` means "the current user."
+> - `$newUPN = $_.SamAccountName + "@teachrich.com"` — builds the new cloud-ready UPN from the user's login name.
+> - `Set-ADUser $_ -UserPrincipalName $newUPN` — applies it.
+>
+> **Watch out for:** This only works if `teachrich.com` is already **verified** in Entra ID (see Prerequisites). If it isn't, the users will sync but their UPNs get replaced with the `.onmicrosoft.com` fallback — a classic real-world gotcha.
 
 **SC-300 exam tip:** UPN matching is a key sync concept. Know that on-prem UPN suffixes must match a verified domain in Entra ID for soft-matching to work. The `.local` suffix cannot be synced directly.
 
@@ -261,10 +361,10 @@ For this lab, use **Customize** to understand all the options:
    - Check **Enable Single Sign-On**
    - Click **Next**
 4. **Connect to Microsoft Entra ID:**
-   - Enter your Global Admin credentials (`admin@thecyberkhroniclesgmail.onmicrosoft.com`)
+   - Enter your Global Admin credentials (`admin@teachrich.com` — or your tenant's initial `admin@<tenant>.onmicrosoft.com` account if you prefer)
    - Click **Next**
 5. **Connect directories:**
-   - Forest: `iamlabcorp.local`
+   - Forest: `teachrich.local`
    - Click **Add Directory** → enter domain admin credentials
    - Click **Next**
 6. **Domain and OU filtering:**
@@ -299,6 +399,14 @@ On the server:
 Get-ADSyncScheduler
 Get-ADSyncConnectorRunStatus
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Reports on the Entra Connect sync engine.
+>
+> **Line by line:**
+> - `Get-ADSyncScheduler` — shows the sync schedule: how often sync runs (the default cycle is **every 30 minutes**), whether syncing is currently enabled, and whether a cycle is in progress. That 30-minute interval is the reason newly created or disabled on-prem accounts don't appear in the cloud instantly.
+> - `Get-ADSyncConnectorRunStatus` — shows whether a sync run is active right now and whether the last run succeeded. Empty output means nothing is currently running (normal between cycles).
 
 In the Entra portal:
 1. Go to **entra.microsoft.com** → **Entra ID** → **Entra Connect** (or **Microsoft Entra Connect**)
@@ -379,16 +487,35 @@ On your domain controller:
 New-ADUser `
     -Name "Jessica Thompson Duplicate" `
     -SamAccountName "jessica.thompson2" `
-    -UserPrincipalName "jessica.thompson@thecyberkhroniclesgmail.onmicrosoft.com" `
-    -Path "OU=Engineering,DC=iamlabcorp,DC=local" `
+    -UserPrincipalName "jessica.thompson@teachrich.com" `
+    -Path "OU=Engineering,DC=teachrich,DC=local" `
     -AccountPassword (ConvertTo-SecureString "UserPass2026!" -AsPlainText -Force) `
     -Enabled $true
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Deliberately creates a second account that claims a UPN (`jessica.thompson@teachrich.com`) already in use in the cloud — a planted landmine so you can practice finding and fixing it.
+>
+> **Why it matters:** UPN conflicts are one of the most common real-world sync failures. Being able to *create, identify, and resolve* one on demand is exactly the kind of hands-on troubleshooting an interviewer probes for.
+>
+> **Line by line:**
+> - `New-ADUser -UserPrincipalName "jessica.thompson@teachrich.com"` — the conflict itself: this UPN duplicates an existing cloud identity.
+> - `-SamAccountName "jessica.thompson2"` — note the `2`; the on-prem login name is unique, so the account *creates* fine on-prem. The clash only surfaces later, **during sync**, when the cloud rejects the duplicate UPN. That delay is the whole teaching point.
 
 Wait for the next sync cycle (30 minutes) or force a sync:
 ```powershell
 Start-ADSyncSyncCycle -PolicyType Delta
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Forces a sync immediately instead of waiting for the 30-minute schedule.
+>
+> **Line by line:**
+> - `Start-ADSyncSyncCycle -PolicyType Delta` — runs a **Delta** sync, which processes only what *changed* since the last run (fast). The alternative, `-PolicyType Initial`, re-evaluates **every** object and is much slower — you'd only use it after changing sync rules or filtering.
+>
+> **Watch out for:** After running this, check **Entra ID → Entra Connect → sync errors**. You should see the duplicate-UPN error. Resolve it by changing the on-prem user's UPN (or deleting the duplicate), then force another Delta sync and confirm the error clears.
 
 Then check:
 1. Go to **Entra ID** → **Entra Connect** → view sync errors
@@ -407,11 +534,11 @@ Then check:
 Checklist:
 
 - [ ] Windows Server VM running with AD DS installed
-- [ ] Domain `iamlabcorp.local` created
+- [ ] Domain `teachrich.local` created
 - [ ] OUs created for each department
 - [ ] 15 on-prem users created across departments
 - [ ] IdFix scanned and issues resolved
-- [ ] UPN suffixes updated to match cloud domain
+- [ ] UPN suffixes updated to match cloud domain (`teachrich.com`)
 - [ ] Entra Connect installed with custom settings
 - [ ] Password Hash Synchronization configured
 - [ ] Seamless SSO enabled
@@ -431,7 +558,7 @@ Checklist:
 3. **Pass-Through Auth** keeps passwords on-prem but requires agent infrastructure
 4. **Seamless SSO** is an add-on to PHS or PTA for transparent sign-in from domain-joined devices
 5. **IdFix** must be run before any sync deployment to prevent errors
-6. **UPN suffixes** must match a verified cloud domain for proper identity matching
+6. **UPN suffixes** must match a verified cloud domain (`teachrich.com`) for proper identity matching
 7. **Cloud Sync** is the newer, simpler alternative — better for basic scenarios and multi-forest
 8. **Connect Health** monitors sync status and requires P1/P2
 
