@@ -6,7 +6,7 @@
 
 ## Scenario
 
-IAM Lab Corp is growing fast. HR has sent you a list of new employees starting next month. You need to create their accounts, set up the right groups, manage licenses, and build automation so this process is repeatable every month.
+TeachRich is growing fast. HR has sent you a list of new employees starting next month. You need to create their accounts, set up the right groups, manage licenses, and build automation so this process is repeatable every month.
 
 In this lab, you will use both the Microsoft Entra admin center and Microsoft Graph PowerShell to demonstrate different approaches to user and group lifecycle management.
 
@@ -85,6 +85,10 @@ Attribute Assignment Reader
 
 > **Troubleshooting note:** If you change API permissions or role assignments, disconnect and reconnect to Microsoft Graph before testing again.
 
+> #### 📘 Why Application permissions (not Delegated) here
+>
+> This lab runs **app-only** (a certificate signs in as the app itself, with no user present), so it needs **Application permissions** — which always require admin consent. The `.All` suffix means tenant-wide scope: `User.ReadWrite.All` lets the app manage *every* user, not just one. That power is exactly why these need admin consent and why, in production, you'd grant the **minimum** set the automation actually uses rather than the whole list above.
+
 ---
 
 ## Step 1: Create Users Manually via the Portal
@@ -93,15 +97,15 @@ Attribute Assignment Reader
 
 Create 3 users manually to understand the portal experience before automating.
 
-| Field          | User 1                                                        | User 2                                                              | User 3                                                  |
-| -------------- | ------------------------------------------------------------- | ------------------------------------------------------------------- | ------------------------------------------------------- |
-| Display name   | Zara Ahmed                                                    | Carlos Rivera                                                       | Mei Lin                                                 |
-| UPN            | [zara.ahmed@yourdomain.com](mailto:zara.ahmed@yourdomain.com) | [carlos.rivera@yourdomain.com](mailto:carlos.rivera@yourdomain.com) | [mei.lin@yourdomain.com](mailto:mei.lin@yourdomain.com) |
-| First name     | Zara                                                          | Carlos                                                              | Mei                                                     |
-| Last name      | Ahmed                                                         | Rivera                                                              | Lin                                                     |
-| Department     | Engineering                                                   | Sales                                                               | Finance                                                 |
-| Job title      | Cloud Engineer                                                | Sales Director                                                      | Financial Controller                                    |
-| Usage location | US                                                            | US                                                                  | US                                                      |
+| Field          | User 1                                                          | User 2                                                                | User 3                                                    |
+| -------------- | -------------------------------------------------------------- | -------------------------------------------------------------------- | --------------------------------------------------------- |
+| Display name   | Zara Ahmed                                                     | Carlos Rivera                                                        | Mei Lin                                                   |
+| UPN            | [zara.ahmed@teachrich.com](mailto:zara.ahmed@teachrich.com)   | [carlos.rivera@teachrich.com](mailto:carlos.rivera@teachrich.com)   | [mei.lin@teachrich.com](mailto:mei.lin@teachrich.com)    |
+| First name     | Zara                                                          | Carlos                                                              | Mei                                                      |
+| Last name      | Ahmed                                                         | Rivera                                                             | Lin                                                     |
+| Department     | Engineering                                                  | Sales                                                              | Finance                                                 |
+| Job title      | Cloud Engineer                                               | Sales Director                                                     | Financial Controller                                    |
+| Usage location | US                                                           | US                                                                | US                                                      |
 
 For each user:
 
@@ -144,13 +148,13 @@ Usage location is especially important because it is required before assigning M
 
 Example users:
 
-| Name [displayName] | User name [userPrincipalName]                                       | Initial password | Block sign in | First name | Last name | Job title         | Department      | Usage location |
-| ------------------ | ------------------------------------------------------------------- | ---------------- | ------------- | ---------- | --------- | ----------------- | --------------- | -------------- |
-| Fatima Hassan      | [fatima.hassan@yourdomain.com](mailto:fatima.hassan@yourdomain.com) | TempPass2026!    | No            | Fatima     | Hassan    | HR Specialist     | Human Resources | US             |
-| James Okafor       | [james.okafor@yourdomain.com](mailto:james.okafor@yourdomain.com)   | TempPass2026!    | No            | James      | Okafor    | IT Support Lead   | IT              | US             |
-| Sofia Petrov       | [sofia.petrov@yourdomain.com](mailto:sofia.petrov@yourdomain.com)   | TempPass2026!    | No            | Sofia      | Petrov    | Marketing Manager | Marketing       | US             |
-| Raj Gupta          | [raj.gupta@yourdomain.com](mailto:raj.gupta@yourdomain.com)         | TempPass2026!    | No            | Raj        | Gupta     | DevOps Engineer   | Engineering     | US             |
-| Emma Wilson        | [emma.wilson@yourdomain.com](mailto:emma.wilson@yourdomain.com)     | TempPass2026!    | No            | Emma       | Wilson    | Account Manager   | Sales           | US             |
+| Name [displayName] | User name [userPrincipalName]                                   | Initial password | Block sign in | First name | Last name | Job title         | Department      | Usage location |
+| ------------------ | --------------------------------------------------------------- | ---------------- | ------------- | ---------- | --------- | ----------------- | --------------- | -------------- |
+| Fatima Hassan      | [fatima.hassan@teachrich.com](mailto:fatima.hassan@teachrich.com) | TempPass2026!    | No            | Fatima     | Hassan    | HR Specialist     | Human Resources | US             |
+| James Okafor       | [james.okafor@teachrich.com](mailto:james.okafor@teachrich.com)   | TempPass2026!    | No            | James      | Okafor    | IT Support Lead   | IT              | US             |
+| Sofia Petrov       | [sofia.petrov@teachrich.com](mailto:sofia.petrov@teachrich.com)   | TempPass2026!    | No            | Sofia      | Petrov    | Marketing Manager | Marketing       | US             |
+| Raj Gupta          | [raj.gupta@teachrich.com](mailto:raj.gupta@teachrich.com)         | TempPass2026!    | No            | Raj        | Gupta     | DevOps Engineer   | Engineering     | US             |
+| Emma Wilson        | [emma.wilson@teachrich.com](mailto:emma.wilson@teachrich.com)     | TempPass2026!    | No            | Emma       | Wilson    | Account Manager   | Sales           | US             |
 
 6. Save the CSV.
 7. Upload the CSV.
@@ -207,6 +211,21 @@ Get-MgContext
 
 If the connection is successful, `Get-MgContext` should show your tenant ID, client ID, and authentication context.
 
+> #### 📘 Script explained
+>
+> **What it does:** Signs in to Microsoft Graph **as the app itself** (not as a person) using a certificate, so the rest of the script can run with no human and no password.
+>
+> **Why it matters:** This is the production automation pattern. A scheduled JML (Joiner-Mover-Leaver) job can't stop to ask a human to log in — it authenticates with a certificate it holds. Showing certificate-based app-only auth (instead of an interactive `Connect-MgGraph` pop-up) signals to a reviewer that you understand unattended, secure automation.
+>
+> **Line by line:**
+> - `$TenantId` / `$ClientId` — identify *which* tenant and *which* app registration you're signing in as.
+> - `Read-Host ... -AsSecureString` — prompts for the certificate's password and keeps it as an encrypted in-memory string, so the password is never written into the script or shown on screen.
+> - `New-Object ...X509Certificate2(...)` — loads the certificate (including its private key) from the `.pfx` file into memory.
+> - `Connect-MgGraph -Certificate $cert` — authenticates using that certificate. The app proves who it is by holding the private key — no shared secret travels over the wire.
+> - `Get-MgContext` — confirms the connection and shows the tenant, app, and permission scopes you're now operating with.
+>
+> **Watch out for:** Prompting for the PFX password (rather than hard-coding it) is the right habit — keep it that way. Never commit the `.pfx` file to source control, and in production store the certificate in a machine certificate store or Azure Key Vault, not a `Documents` folder.
+
 ---
 
 ### 3c: Create the CSV file
@@ -249,6 +268,21 @@ You can also preview the file:
 Import-Csv ./data/BulkUsers.csv | Format-Table
 ```
 
+> #### 📘 Script explained
+>
+> **What it does:** Creates a `./data` folder and writes a 10-row CSV of sample employees to disk, then confirms and previews it.
+>
+> **Why it matters:** It separates **data** (the list of people) from **logic** (the script that creates them). That's a real engineering habit — next month HR hands you a new CSV and the *same* script processes it, untouched. Reviewers read that as "thinks in repeatable pipelines, not one-off commands."
+>
+> **Line by line:**
+> - `New-Item -ItemType Directory -Path ./data -Force | Out-Null` — creates the folder. `-Force` stops it erroring if the folder already exists; `| Out-Null` hides the confirmation output.
+> - `@"` … `"@` — a **here-string**: a multi-line block of literal text. Here it holds the CSV contents (a header row plus ten data rows).
+> - `| Out-File -FilePath ./data/BulkUsers.csv -Encoding UTF8` — writes that text to the CSV file. UTF-8 encoding avoids character-corruption issues with names.
+> - `Test-Path` — returns `True` if the file now exists.
+> - `Import-Csv | Format-Table` — reads the CSV back and prints it as a table so you can eyeball it before using it.
+>
+> **Watch out for:** In real life the CSV comes *from HR*, not hard-coded in the script. This inline version is just to make the lab self-contained.
+
 ---
 
 ### 3d: Create users from the CSV
@@ -258,7 +292,7 @@ Replace the domain with your verified Microsoft Entra domain.
 Example:
 
 ```powershell
-$Domain = "yourdomain.com"
+$Domain = "teachrich.com"
 ```
 
 Full script:
@@ -270,7 +304,7 @@ Full script:
 
 Import-Module Microsoft.Graph.Users
 
-$Domain = "yourdomain.com" # Replace with your verified Entra ID domain
+$Domain = "teachrich.com" # Replace with your verified Entra ID domain
 $csvPath = "./data/BulkUsers.csv"
 
 if (-not (Test-Path $csvPath)) {
@@ -329,6 +363,28 @@ foreach ($user in $users) {
 Write-Host "`nBulk user creation process completed." -ForegroundColor Green
 ```
 
+> #### 📘 Script explained
+>
+> **What it does:** Reads the CSV and creates each person in Entra ID — but skips anyone who already exists, and reports success, skip, or failure for every row.
+>
+> **Why it matters:** This is the *production-grade* version of "create users." It's **idempotent** (safe to run twice — it won't create duplicates), it has **error handling** (one bad row won't crash the whole batch), and it produces a **clear run log**. Those three properties are exactly what separates a throwaway script from something you'd trust in a real onboarding pipeline.
+>
+> **Line by line:**
+> - `Import-Module Microsoft.Graph.Users` — loads the Graph commands for managing users.
+> - `if (-not (Test-Path $csvPath)) { ... return }` — stops early with a clear message if the data file is missing.
+> - `$users = Import-Csv $csvPath` — loads each CSV row as an object you can read by column name.
+> - `foreach ($user in $users)` — runs the block once per person.
+> - `.Trim()` — strips accidental spaces around the names so the generated username is clean.
+> - `$upn` / `$mailNickname` — build the sign-in name as `first.last@teachrich.com`, forced lowercase for consistency.
+> - `try { … } catch { … }` — wraps each creation so a single failure is logged and the loop keeps going.
+> - `Get-MgUser -Filter "userPrincipalName eq '$upn'"` — checks whether this user already exists. **This check is what makes the script idempotent.**
+> - `if (-not $existing) { … } else { [EXISTS] }` — only creates when the user isn't found; otherwise logs a skip.
+> - `$params = @{ … }` — a hashtable of all the new user's attributes. `PasswordProfile` is a *nested* hashtable holding a randomised starting password and `ForceChangePasswordNextSignIn = $true`.
+> - `New-MgUser -BodyParameter $params` — creates the account.
+> - The colour-coded `Write-Host` lines (green/yellow/red) give you an at-a-glance report of what happened to each row.
+>
+> **Watch out for:** `Get-Random` for the password is fine for a lab, but in production use a cryptographically secure generator and deliver the password through a secure channel — or skip starting passwords entirely with a **Temporary Access Pass** (Lab 5). Also, `UsageLocation` is hard-coded to `"US"`; set it to where each user actually is, because it drives license eligibility and data-residency rules.
+
 ---
 
 ### 3e: Verify the users
@@ -340,6 +396,12 @@ Select-Object DisplayName, Department, JobTitle, UserPrincipalName |
 Sort-Object Department |
 Format-Table -AutoSize
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Lists every user with their department, title, and UPN, grouped by department.
+>
+> **Line by line:** `Get-MgUser -All -Property "..."` fetches all users — and you must name `department` and `jobTitle` explicitly, because Graph returns only a minimal set of fields unless you ask for more. `Select-Object` keeps the columns you want, `Sort-Object Department` groups them, and `Format-Table -AutoSize` prints a tidy grid.
 
 ### Why this matters
 
@@ -399,6 +461,13 @@ Create additional dynamic groups:
 | `DG-Finance-All`     | `user.department -eq "Finance"`                                                                                       | All Finance employees  |
 | `DG-Senior-Staff`    | `(user.jobTitle -contains "Senior") -or (user.jobTitle -contains "Director") -or (user.jobTitle -contains "Manager")` | All senior-level staff |
 
+> #### 📘 Membership rules explained
+>
+> These rules are **dynamic membership queries** — Entra ID re-evaluates them automatically as user attributes change, so the group keeps itself current with no manual upkeep.
+> - `user.department -eq "Engineering"` — include any user whose Department attribute *equals* "Engineering". The moment someone's department is set to Engineering, they're added; change it, they're removed.
+> - `user.employeeType -eq "Contractor"` — the same idea on the EmployeeType attribute (which you set during creation in Step 3d).
+> - The `DG-Senior-Staff` rule uses `-contains` (substring match) joined with `-or`, so anyone whose job title *contains* "Senior", "Director", or "Manager" qualifies. **Watch the operators:** `-eq` is an exact match; `-contains` matches part of the text — mixing them up is a common reason a dynamic group ends up empty or over-populated.
+
 > **Note:** Dynamic group membership requires Microsoft Entra ID P1 or P2.
 
 ---
@@ -427,6 +496,17 @@ Get-MgGroup -All `
 Select-Object DisplayName, GroupTypes, SecurityEnabled, MailEnabled, MembershipRule |
 Format-Table -AutoSize
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Lists every group with the four properties that actually reveal *what kind* of group it is.
+>
+> **Why it matters:** Those four fields are exactly how you tell the types apart in practice — useful in an audit when you need to prove which groups are security vs collaboration, and which are dynamic.
+>
+> **Line by line:**
+> - `groupTypes` — contains `Unified` for a Microsoft 365 group; empty for a plain security group. It also contains `DynamicMembership` when the group is rule-based.
+> - `securityEnabled` / `mailEnabled` — a **security** group is security-enabled; a **Microsoft 365** group is mail-enabled. The combination tells you the type.
+> - `membershipRule` — only populated for **dynamic** groups (it holds the rule text from 4b). If it's blank, the group is assigned.
 
 ### Why this matters
 
@@ -560,6 +640,19 @@ Request_UnsupportedQuery
 
 use the fallback method below.
 
+> #### 📘 Script explained
+>
+> **What it does:** Asks Graph to return **only** the users whose `ClearanceLevel` attribute equals "Confidential" — filtering on the server rather than pulling everyone down first.
+>
+> **Why it matters:** Server-side filtering is far more efficient at scale. But custom-security-attribute filters are classed as **advanced queries**, which need two extra ingredients most people forget — and that's the whole teaching point of this step.
+>
+> **Line by line:**
+> - `-Filter "customSecurityAttributes/IAMAttributes/ClearanceLevel eq 'Confidential'"` — the server-side filter, drilling into the nested attribute path (attribute set → attribute → value).
+> - `-ConsistencyLevel eventual` **and** `-CountVariable count` — these two are **required together** for advanced queries on custom security attributes. Omit either and Graph rejects the request. (`$count` also gives you a running total.)
+> - `-Property "...,customSecurityAttributes"` — you must explicitly request the attributes, or they come back empty.
+>
+> **Watch out for:** If the app lacks the attribute-read permission/role, or the attribute set/attribute name is mistyped, Graph throws `Request_UnsupportedQuery` or `Invalid custom security attribute`. When that happens, use the fallback in 5f.
+
 ---
 
 ### 5f: Fallback Query Method
@@ -594,6 +687,22 @@ foreach ($user in $users) {
 
 $results | Format-Table -AutoSize
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Pulls **all** users with their custom attributes, then filters for "Confidential" *inside PowerShell* instead of on the server — a reliable fallback when the advanced query in 5e isn't available.
+>
+> **Why it matters:** It always works, even without the eventual-consistency query support — handy when permissions or query support are the blocker. The trade-off is it's slower at scale because it downloads everyone first.
+>
+> **Line by line:**
+> - `$results = @()` — starts an empty array to collect matches.
+> - `Get-MgUser -All -Property "...,customSecurityAttributes"` — fetch every user *with* their attributes.
+> - `$user.CustomSecurityAttributes.AdditionalProperties` — custom attributes arrive as a nested property bag; this reaches into it.
+> - `if ($attrs -and $attrs.ContainsKey("IAMAttributes"))` — guards against users who have **no** attributes set, so the next line doesn't error.
+> - `if ($iamAttrs["ClearanceLevel"] -eq "Confidential")` — the actual local filter.
+> - `$results += [PSCustomObject]@{ … }` — builds a clean, named output row for each match.
+>
+> **Watch out for:** `Get-MgUser -All` loads the whole directory into memory — fine for a lab, but on a large tenant prefer the server-side query (5e) once the permissions are sorted.
 
 ### Why this matters
 
@@ -639,6 +748,14 @@ SPB
 ```
 
 > **Important:** Use the SKU that exists in your tenant. If your tenant shows `SPE_E3`, use `SPE_E3`. If your tenant shows `SPE_E5`, use `SPE_E5`.
+
+> #### 📘 Script explained
+>
+> **What it does:** Lists every license SKU your tenant owns, showing how many seats are used (`ConsumedUnits`) versus purchased (`Enabled`).
+>
+> **Why it matters:** License SKU identifiers are **tenant-specific**, and you assign licenses by `SkuId`, not by friendly name. Running this *first* is what prevents the "SKU not found" error later — you copy the exact `SkuPartNumber`/`SkuId` your tenant actually has.
+>
+> **Line by line:** `Get-MgSubscribedSku` returns the licenses. The calculated property `@{Name="Enabled";Expression={$_.PrepaidUnits.Enabled}}` reaches into the nested `PrepaidUnits` object to surface the purchased-seat count as a simple column. (`SPE_E3` = Microsoft 365 E3, `SPE_E5` = E5, `AAD_PREMIUM_P2` = Entra ID P2.)
 
 ---
 
@@ -743,6 +860,23 @@ foreach ($user in $unlicensedUsers) {
 Write-Host "`nLicense assignment process completed." -ForegroundColor Green
 ```
 
+> #### 📘 Script explained
+>
+> **What it does:** Finds every internal user with no license, makes sure their **UsageLocation** is set, then assigns the chosen license — logging the result for each user.
+>
+> **Why it matters:** License assignment has a real-world ordering trap: **you cannot assign a Microsoft 365 license until the user has a UsageLocation** (it's a legal/data-residency requirement). This script handles that dependency *and* the short delay before the change takes effect — which is exactly the kind of robustness an interviewer is listening for.
+>
+> **Line by line:**
+> - `$sku = Get-MgSubscribedSku | Where-Object { $_.SkuPartNumber -eq $skuPartNumber }` — looks up the license object you want to assign.
+> - `if (-not $sku) { … return }` — **fail-fast**: if that SKU doesn't exist in the tenant, it prints the available ones and stops, instead of erroring cryptically later.
+> - `Get-MgUser -All ... | Where-Object { $_.AssignedLicenses.Count -eq 0 -and $_.UserPrincipalName -notlike "*#EXT#*" }` — selects users with **zero** licenses, and the `#EXT#` filter **excludes guest accounts** (guests carry `#EXT#` in their UPN).
+> - `if ([string]::IsNullOrWhiteSpace($user.UsageLocation) ...)` — if UsageLocation is missing or wrong, `Update-MgUser` sets it.
+> - `Start-Sleep -Seconds 8` then re-`Get-MgUser` — waits for the UsageLocation change to **propagate**, then re-reads the user so the next step sees the updated value.
+> - `Set-MgUserLicense -AddLicenses @(@{SkuId = $sku.SkuId}) -RemoveLicenses @()` — assigns the license. `-AddLicenses` takes an array of hashtables; `-RemoveLicenses @()` means "remove nothing."
+> - `try/catch` — logs a clear success or the exact error per user.
+>
+> **Watch out for:** The 8-second `Start-Sleep` is a pragmatic fix for replication delay — fine for a lab, but for large runs you'd use a retry/poll loop instead of a fixed wait. And direct license assignment is good to *understand*, but **group-based licensing (Step 7) is the scalable production pattern** — assign once to a group, and membership drives the licenses.
+
 ### Why this matters
 
 License assignment is a common identity administration task. In production, this is often automated through group-based licensing, but it is important to understand direct license assignment first.
@@ -785,6 +919,10 @@ Know that:
 * Users can receive licenses from multiple groups.
 * License assignment errors should be reviewed in the group licensing blade.
 
+> #### 📘 Why this is the better pattern
+>
+> Notice how Steps 4b, 6, and 7 connect: the **dynamic group** `DG-Engineering-All` auto-populates from the `department` attribute, and group-based licensing assigns E3 to that group. The result is a **fully automated lifecycle** — create a user with Department = Engineering (Step 3d) and they're auto-added to the group *and* auto-licensed, with no per-user license step at all. That chain (attribute → dynamic group → inherited license) is the production answer to "how do you license at scale," and a strong thing to be able to narrate in an interview.
+
 ---
 
 ## Step 8: Export a License Report
@@ -813,6 +951,18 @@ To view the report:
 ```powershell
 Import-Csv ./reports/license-report.csv | Format-Table -AutoSize
 ```
+
+> #### 📘 Script explained
+>
+> **What it does:** Writes a CSV listing every user with their department, usage location, and how many licenses they hold.
+>
+> **Why it matters:** Reporting is evidence. A CSV you can hand to a manager or attach to an audit shows you don't just *make* changes, you *verify and document* them — a habit auditors and hiring managers both value.
+>
+> **Line by line:**
+> - `New-Item ... -Force | Out-Null` — ensures the `reports` folder exists.
+> - `Get-MgUser -All -Property "...,assignedLicenses,..."` — pulls everyone, explicitly requesting the license field.
+> - `@{Name="LicenseCount";Expression={$_.AssignedLicenses.Count}}` — a **calculated property**: instead of dumping the raw license objects, it counts them into a simple number column.
+> - `Export-Csv -NoTypeInformation` — writes the CSV. `-NoTypeInformation` omits the legacy type header line so the file is clean.
 
 ### Why this matters
 
@@ -945,7 +1095,7 @@ to match a SKU in your tenant.
 Set the usage location first:
 
 ```powershell
-Update-MgUser -UserId user@yourdomain.com -UsageLocation "US"
+Update-MgUser -UserId user@teachrich.com -UsageLocation "US"
 ```
 
 Then wait a few seconds and try assigning the license again.
