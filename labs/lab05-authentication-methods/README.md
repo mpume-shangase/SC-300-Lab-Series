@@ -58,6 +58,22 @@ zara.ahmed@teachrich.com
 
 ---
 
+## Portal Navigation Reference
+
+The Microsoft Entra admin center sidebar is organised into the following sections. Use this as your reference throughout the lab:
+
+**Entra ID** section (top):
+Overview → Users → Groups → Devices → Agents → Enterprise apps → App registrations → Roles & admins → Delegated admin partners → Tenant governance → Domain services → Conditional Access → Multifactor authentication → Identity Secure Score → **Authentication methods** → Account recovery → **Password reset** → Custom security attributes → Certificate authorities → External Identities → Cross-tenant synchronization → Entra Connect → Backup and recovery → Domain names → Custom branding → Mobility → Monitoring & health
+
+**ID Protection** section:
+Dashboard → Risk-based Conditional Access → Risky users → Risky workload identities → Risky agents
+
+**ID Governance** | **Verified ID** | **Global Secure Access** | What's new | Billing | Security Store
+
+> **Tip:** When portal navigation does not match lab instructions, use the **search bar** at the top of the Entra admin center. Searching by feature name (for example, "Password protection" or "Authentication methods") is the most reliable way to surface a blade directly.
+
+---
+
 ## Required Microsoft Graph API Permissions
 
 If you are using certificate-based app-only authentication, your app registration needs Microsoft Graph **Application permissions**.
@@ -209,7 +225,7 @@ Know when each authentication method is appropriate:
 
 ## Step 2: Configure Authentication Methods Policy
 
-**Where:** Microsoft Entra admin center → Protection → Authentication methods → Policies
+**Where:** Microsoft Entra admin center → Entra ID → Authentication methods → Policies
 
 This is where you enable or disable authentication methods for the TeachRich tenant.
 
@@ -526,7 +542,7 @@ There are multiple ways to enforce MFA. The lab focuses on understanding each ap
 
 ### 4a: Security Defaults
 
-**Where:** Microsoft Entra admin center → Identity → Overview → Properties → Manage security defaults
+**Where:** Microsoft Entra admin center → Entra ID → Overview → Properties → Manage security defaults
 
 Security Defaults is a simple tenant-wide protection baseline.
 
@@ -547,7 +563,7 @@ Security Defaults and Conditional Access are not used together. If you need gran
 
 ### 4b: Per-User MFA
 
-**Where:** Microsoft Entra admin center → Identity → Users → All users → Per-user MFA
+**Where:** Microsoft Entra admin center → Entra ID → Users → All users → Per-user MFA
 
 1. Open the **Per-user MFA** page.
 2. Review the MFA states.
@@ -556,11 +572,11 @@ Security Defaults and Conditional Access are not used together. If you need gran
 
 The three per-user MFA states are:
 
-| State    | Meaning                                                     |
-| -------- | ----------------------------------------------------------- |
-| Disabled | MFA is not enabled for the user through legacy per-user MFA |
-| Enabled  | User is required to register MFA at next sign-in            |
-| Enforced | User has registered MFA and must use it                     |
+| State    | Meaning                                                      |
+| -------- | ------------------------------------------------------------ |
+| Disabled | MFA is not enabled for the user through legacy per-user MFA  |
+| Enabled  | User is required to register MFA at next sign-in             |
+| Enforced | User has registered MFA and must use it                      |
 
 ### Why this matters
 
@@ -595,9 +611,7 @@ Conditional Access allows TeachRich to require MFA in the right situations inste
 
 ## Step 5: Configure Self-Service Password Reset
 
-**Where:** Microsoft Entra admin center → Protection → Password reset
-
-Self-service password reset allows users to reset their own passwords without contacting the help desk.
+**Where:** Microsoft Entra admin center → Entra ID → Password reset
 
 ---
 
@@ -726,9 +740,9 @@ zara.ahmed@teachrich.com
 
 ## Step 6: Implement Microsoft Entra Password Protection
 
-**Where:** Microsoft Entra admin center → Protection → Authentication methods → Password protection
+**Where:** Microsoft Entra admin center → Entra ID → Authentication methods → Password protection
 
-Password protection helps prevent users from choosing weak or predictable passwords.
+> **Portal note:** Click **Authentication methods** in the Entra ID section of the sidebar, then select **Password protection** from the sub-menu or tabs inside that blade. If the sub-item is not visible, use the search bar at the top of the portal and search for "Password protection".
 
 ---
 
@@ -786,7 +800,7 @@ Know the difference between:
 
 ### 6b: Test Password Protection
 
-1. Try to reset a test user’s password to something that includes a banned word, such as:
+1. Try to reset a test user's password to something that includes a banned word, such as:
 
 ```text
 TeachRich2026!
@@ -896,7 +910,7 @@ catch {
 > * `$UserPrincipalName` stores the test account.
 > * `Get-MgUser` retrieves the user object.
 > * `Update-MgUser -AccountEnabled:$false` disables the account.
-> * `Invoke-MgGraphRequest ... /revokeSignInSessions` revokes the user’s refresh tokens.
+> * `Invoke-MgGraphRequest ... /revokeSignInSessions` revokes the user's refresh tokens.
 > * The second `Update-MgUser -AccountEnabled:$true` re-enables the test account after the lab.
 > * `try/catch` provides clean error output if any step fails.
 >
@@ -915,30 +929,31 @@ Know the difference between disabling an account and revoking sessions:
 
 ---
 
-## Step 8: Configure Combined Registration
+## Step 8: Verify Combined Registration
 
-Combined registration allows users to register MFA and SSPR methods in one experience.
+> **Portal note (2026):** The "Combined security information registration" toggle no longer exists in the Microsoft Entra admin center. Combined registration is now enabled by default for all tenants and cannot be disabled. There is nothing to configure. Proceed directly to testing below.
 
-**Where:** Microsoft Entra admin center → Identity → Users → User settings → User feature settings
+Combined registration allows users to register MFA and SSPR methods in a single experience at `https://aka.ms/mysecurityinfo`. Because it is on by default, your focus in this step is to verify that it is working correctly for TeachRich users.
 
-1. Look for **Combined security information registration**.
-2. Ensure it is enabled for:
+### Test combined registration
 
-```text
-All users
-```
-
-3. Test it by opening an incognito/private browser window.
-4. Go to:
+1. Open an incognito/private browser window.
+2. Go to:
 
 ```text
 https://aka.ms/mysecurityinfo
 ```
 
-5. Sign in as a test user.
-6. Add Microsoft Authenticator.
-7. Add a phone number or email method.
-8. Confirm that the same security information supports MFA and SSPR.
+3. Sign in as a test user:
+
+```text
+zara.ahmed@teachrich.com
+```
+
+4. Add Microsoft Authenticator.
+5. Add a phone number or email method.
+6. Confirm that the same security information page supports both MFA and SSPR method registration.
+7. Screenshot the registered methods for your portfolio.
 
 ### Why this matters
 
@@ -946,7 +961,7 @@ Combined registration improves user experience because users register security i
 
 ### SC-300 exam tip
 
-Know that combined registration is the modern security information registration experience.
+The exam may still reference the combined registration toggle as a concept. Know that it existed as a configurable setting and that Microsoft enabled it by default for all tenants. In the current portal, there is no toggle to find — combined registration is simply always on.
 
 ---
 
@@ -1093,7 +1108,7 @@ Use this checklist to confirm completion:
 * [ ] Password protection tested
 * [ ] Account disable tested
 * [ ] Session revocation tested
-* [ ] Combined registration reviewed or tested
+* [ ] Combined registration tested at aka.ms/mysecurityinfo
 * [ ] Authentication methods reviewed for a user
 * [ ] Authentication readiness report exported to `./reports/authentication-readiness-report.csv`
 
@@ -1108,7 +1123,7 @@ Recommended screenshots:
 * SSPR notifications
 * Password protection custom banned password list
 * Per-user MFA page showing legacy state
-* Combined security information page
+* Security information page at aka.ms/mysecurityinfo showing registered methods
 * PowerShell output for TAP creation
 * PowerShell output for disable/revoke test
 * Authentication readiness report CSV
@@ -1254,7 +1269,7 @@ During an incident, also consider:
 7. SSPR reduces help desk workload and requires users to register recovery methods.
 8. Password protection blocks common and company-specific weak passwords.
 9. Disabling an account blocks new sign-ins, while revoking sessions invalidates active refresh tokens.
-10. Combined registration gives users one place to register MFA and SSPR methods.
+10. Combined registration is enabled by default for all tenants. Users register MFA and SSPR methods in one place at aka.ms/mysecurityinfo.
 11. Reports and screenshots provide evidence for your portfolio.
 
 ---
